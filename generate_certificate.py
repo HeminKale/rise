@@ -69,28 +69,8 @@ def generate_certificate(base_pdf_path: str, output_pdf_path: str, values: Dict[
     doc = fitz.open(base_pdf_path)
     page = doc[0]
 
-    # Test basic text rendering
-    page.insert_text((100, 100), "TEST TEXT - RED", fontsize=20, fontname="Times-Bold", color=(1, 0, 0))
-    print("🔍 Added test text at position (100, 100)")
-    
-    # Test insert_centered_textbox function directly
-    test_rect = fitz.Rect(200, 200, 400, 250)
-    insert_centered_textbox(page, test_rect, "CENTERED TEST", "Times-Bold", 20, (1, 0, 0))
-    print("🔍 Added centered test text in rectangle (200, 200, 400, 250)")
-    
-    # Test with simple insert_textbox (without our custom function)
-    page.insert_textbox(
-        fitz.Rect(300, 300, 500, 350),
-        "SIMPLE TEST",
-        fontsize=20,
-        fontname="Times-Bold",
-        color=(1, 0, 0),
-        align=1
-    )
-    print("🔍 Added simple test text in rectangle (300, 300, 500, 350)")
-
     # --- Configuration ---
-    color = (1, 0, 0)  # Red - to test if text is being written
+    color = (0, 0, 0)  # Black text
     fontname = "Times-Bold"  # Use bold font
     coords = {
         "Company Name": fitz.Rect(179.2, 227.6, 476.0, 266.4),
@@ -123,8 +103,8 @@ def generate_certificate(base_pdf_path: str, output_pdf_path: str, values: Dict[
         elif field == "Scope":
             page.draw_rect(rect, color=(1, 1, 0), width=2)  # Yellow for Scope
         
-        # Reduce font size if it doesn't fit
-        while font_size >= 10:
+        # Reduce font size if it doesn't fit, but ensure minimum size
+        while font_size >= 12:  # Increased minimum from 10 to 12
             text_height = get_text_height(text, font_size, fontname, rect.width)
             limit = rect.height if field != "Company Name" else rect.height * 2
             print(f"  📏 Font size {font_size}: text_height={text_height:.1f}, limit={limit:.1f}")
@@ -133,24 +113,51 @@ def generate_certificate(base_pdf_path: str, output_pdf_path: str, values: Dict[
             font_size -= 1
         
         print(f"🖋 Writing '{field}' at font size {font_size}")
-        # Use simple insert_textbox instead of our custom function
-        page.insert_textbox(
-            rect,
-            text,
-            fontsize=font_size,
-            fontname=fontname,
-            color=color,
-            align=1  # Centered
-        )
         
-        # Add a simple test with fixed font size for this field
-        page.insert_text(
-            (rect.x0 + 10, rect.y0 + 10),
-            f"TEST-{field[:3]}",
-            fontsize=12,
-            fontname=fontname,
-            color=(0, 0, 1)  # Blue
-        )
+        if field == "Scope":
+            # Use insert_textbox for Scope to enable text wrapping
+            page.insert_textbox(
+                rect,
+                text,
+                fontsize=font_size,
+                fontname=fontname,
+                color=color,
+                align=1  # Center aligned
+            )
+        elif field == "ISO Standard":
+            # Adjust vertical position for ISO Standard to center it better
+            center_x = (rect.x0 + rect.x1) / 2
+            center_y = (rect.y0 + rect.y1) / 2 + 5  # Slight adjustment down
+            
+            # Calculate text width for centering
+            font_obj = fitz.Font(fontname=fontname)
+            text_width = font_obj.text_length(text, font_size)
+            start_x = center_x - text_width / 2
+            
+            page.insert_text(
+                (start_x, center_y),
+                text,
+                fontsize=font_size,
+                fontname=fontname,
+                color=color
+            )
+        else:
+            # Use insert_text for other fields - center the text manually
+            center_x = (rect.x0 + rect.x1) / 2
+            center_y = (rect.y0 + rect.y1) / 2
+            
+            # Calculate text width for centering
+            font_obj = fitz.Font(fontname=fontname)
+            text_width = font_obj.text_length(text, font_size)
+            start_x = center_x - text_width / 2
+            
+            page.insert_text(
+                (start_x, center_y),
+                text,
+                fontsize=font_size,
+                fontname=fontname,
+                color=color
+            )
 
     doc.save(output_pdf_path)
     print(f"✅ Certificate saved at: {output_pdf_path}")
